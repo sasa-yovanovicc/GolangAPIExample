@@ -1,0 +1,39 @@
+version: '3'
+services:
+  db:
+    build:
+      context: ./docker/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: test_db
+      MYSQL_USER: docker
+      MYSQL_PASSWORD: docker
+    container_name: golang_db
+    volumes:
+      - "dbdata:/var/lib/mysql"
+    restart: always
+    networks:
+     - my_network
+    ports:
+      - "3306:3306"
+    tty: true
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/go/Dockerfile
+    volumes:
+      - ".:/go/src/3fstest"
+    container_name: golang_app
+    restart: always
+    ports:
+      - "3000:3000"
+    networks:
+      - my_network      
+    tty: true
+    depends_on:
+      - db
+volumes:
+  dbdata:
+networks:
+  my_network:
+    driver: bridge

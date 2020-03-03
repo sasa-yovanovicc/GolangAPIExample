@@ -1,0 +1,16 @@
+.git
+.gitignore
+.vscode
+contributors.txt
+docker
+Dockerfile*
+docker-compose*
+README.md
+doc
+go 
+src
+usersapi-server
+vendor
+post_code_gen
+go.mod
+go.sum
