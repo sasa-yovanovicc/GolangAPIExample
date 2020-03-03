@@ -1,0 +1,896 @@
+// This file is safe to edit. Once it exists it will not be overwritten
+
+package custom
+
+import (
+	"3fstest/models"
+	"fmt"
+	"reflect"
+	"testing"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+)
+
+func init() {
+	fmt.Println("INIT...")
+	db := dbConn()
+	//defer db.Close()
+
+	err := db.Exec("DELETE FROM usergroups").Error
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println("DELETE FROM usergroups...")
+
+	err = db.Exec("DELETE FROM users").Error
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println("DELETE FROM users...")
+	err = db.Exec("DELETE FROM groups").Error
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Println("DELETE FROM groups...")
+
+	err = db.Exec("ALTER TABLE usergroups AUTO_INCREMENT = 1").Error
+	if err != nil {
+		panic(err.Error())
+	}
+	err = db.Exec("ALTER TABLE groups AUTO_INCREMENT = 1").Error
+	if err != nil {
+		panic(err.Error())
+	}
+	err = db.Exec("ALTER TABLE users AUTO_INCREMENT = 1").Error
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return
+}
+
+/* USER tests */
+func TestCreateUser(t *testing.T) {
+	fmt.Println("#1 CreateUser(): insert 10 users")
+	fmt.Println("#2 CreateUser(): insert existing user or 3 times use incomplete JSON")
+	type argss struct {
+		params *models.Users
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{name: "User 1",
+			args:     argss{params: &models.Users{ID: 1, Email: "rocky@balboa.com", Password: "123456", Name: "Rocky Balboa"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 2",
+			args:     argss{params: &models.Users{ID: 1, Email: "sean@connery.com", Password: "123456", Name: "Sean Connery"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 3",
+			args:     argss{params: &models.Users{Email: "uma@thurman.com", Password: "3242423", Name: "Uma Thurman"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 4",
+			args:     argss{params: &models.Users{Email: "jeanclaude@vandame.com", Password: "rtyter", Name: "Jean-Claude Van Damme"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 5",
+			args:     argss{params: &models.Users{Email: "nikole@kidman.com", Password: "uytru", Name: "Nicole Kidman"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 6",
+			args:     argss{params: &models.Users{Email: "jason@statham.com", Password: "87yuyu", Name: "Jason Statham"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 7",
+			args:     argss{params: &models.Users{Email: "haruki@murakami.com", Password: "@@5453gf", Name: "Haruki Murakami"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 8",
+			args:     argss{params: &models.Users{Email: "eliud@kupchoge.com", Password: "qweerty", Name: "Eliud Kipchoge"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 9",
+			args:     argss{params: &models.Users{Email: "jasunari@kavabata.com", Password: "poiuyt", Name: "Jasunari Kavabata"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "User 10",
+			args:     argss{params: &models.Users{Email: "harry@potter.com", Password: "asdfgh", Name: "Harry Potter"}},
+			wantCode: 201, wantErr: false,
+		},
+		// errors
+		{
+			name:     "Existing User",
+			args:     argss{params: &models.Users{ID: 1, Email: "rocky@balboa.com", Password: "123456", Name: "Rocky Balboa"}},
+			wantCode: 409, wantErr: true,
+		},
+		{
+			name:     "Incomplete JSON",
+			args:     argss{params: &models.Users{}},
+			wantCode: 422, wantErr: true,
+		},
+		{
+			name:     "Incomplete JSON",
+			args:     argss{params: &models.Users{Password: "123456", Name: "Roadrunner"}},
+			wantCode: 422, wantErr: true,
+		},
+		{
+			name:     "Incomplete JSON",
+			args:     argss{params: &models.Users{Name: "Mickey Mouse"}},
+			wantCode: 422, wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+
+		t.Run(tt.name, func(t *testing.T) {
+			/*
+				if gotCode, err := CreateUser(tt.args.params); (err != nil) != tt.wantErr {
+					t.Errorf("CreateUser() gotCode = %v, error = %v, wantErr %v", gotCode, err, tt.wantErr)
+				}*/
+			gotCode, err := CreateUser(tt.args.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("CreateUser() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestUpdateUser(t *testing.T) {
+	type argss struct {
+		params *models.Users
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "User 2",
+			args:     argss{params: &models.Users{ID: 2, Email: "sir.sean@connery.com", Password: "123456NEW", Name: "Sir Thomas Sean Connery"}},
+			wantCode: 200, wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			/*
+				if gotCode, err := UpdateUser(tt.args.params); (err != nil) != tt.wantErr {
+					t.Errorf("UpdateUser() gotCode = %v, error = %v, wantErr %v", gotCode, err, tt.wantErr)
+				}
+			*/
+			gotCode, err := UpdateUser(tt.args.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UpdateUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("UpdateUser() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+func TestGetUser(t *testing.T) {
+	type argss struct {
+		UserID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantRet  []*models.Users
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Get User 1",
+			args:     argss{UserID: 1},
+			wantRet:  []*models.Users{{ID: 1, Email: "rocky@balboa.com", Password: "123456", Name: "Rocky Balboa"}},
+			wantCode: 200, wantErr: false,
+		},
+		{
+			name:     "Get User 7",
+			args:     argss{UserID: 7},
+			wantRet:  []*models.Users{{ID: 7, Email: "haruki@murakami.com", Password: "@@5453gf", Name: "Haruki Murakami"}},
+			wantCode: 200, wantErr: false,
+		},
+		{
+			name:     "User not exists",
+			args:     argss{UserID: 99999},
+			wantRet:  []*models.Users{},
+			wantCode: 404, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, gotCode, err := GetUser(tt.args.UserID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("GetUser() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("GetUser() gotCode = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+//TODO
+
+func TestGetUserList(t *testing.T) {
+	type argss struct {
+		limit  int32
+		offset int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantRet  []*models.Users
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name: "Get User List without parameters",
+			args: argss{limit: 10, offset: 0}, //default values in swagger.yaml and /restapi/oprations/groups/groups_list_parameters.go
+			wantRet: []*models.Users{
+				{
+					Email:    "rocky@balboa.com",
+					ID:       1,
+					Name:     "Rocky Balboa",
+					Password: "123456",
+				},
+				{
+					Email:    "sir.sean@connery.com",
+					ID:       2,
+					Name:     "Sir Thomas Sean Connery",
+					Password: "123456NEW",
+				},
+				{
+					Email:    "uma@thurman.com",
+					ID:       3,
+					Name:     "Uma Thurman",
+					Password: "3242423",
+				},
+				{
+					Email:    "jeanclaude@vandame.com",
+					ID:       4,
+					Name:     "Jean-Claude Van Damme",
+					Password: "rtyter",
+				},
+				{
+					Email:    "nikole@kidman.com",
+					ID:       5,
+					Name:     "Nicole Kidman",
+					Password: "uytru",
+				},
+				{
+					Email:    "jason@statham.com",
+					ID:       6,
+					Name:     "Jason Statham",
+					Password: "87yuyu",
+				},
+				{
+					Email:    "haruki@murakami.com",
+					ID:       7,
+					Name:     "Haruki Murakami",
+					Password: "@@5453gf",
+				},
+				{
+					Email:    "eliud@kupchoge.com",
+					ID:       8,
+					Name:     "Eliud Kipchoge",
+					Password: "qweerty",
+				},
+				{
+					Email:    "jasunari@kavabata.com",
+					ID:       9,
+					Name:     "Jasunari Kavabata",
+					Password: "poiuyt",
+				},
+				{
+					Email:    "harry@potter.com",
+					ID:       10,
+					Name:     "Harry Potter",
+					Password: "asdfgh",
+				},
+			},
+			wantCode: 200, wantErr: false,
+		},
+		{
+			name: "Get User List limit 3 offset 2",
+			args: argss{limit: 3, offset: 2},
+			wantRet: []*models.Users{{
+				Email:    "uma@thurman.com",
+				ID:       3,
+				Name:     "Uma Thurman",
+				Password: "3242423",
+			},
+				{
+					Email:    "jeanclaude@vandame.com",
+					ID:       4,
+					Name:     "Jean-Claude Van Damme",
+					Password: "rtyter",
+				},
+				{
+					Email:    "nikole@kidman.com",
+					ID:       5,
+					Name:     "Nicole Kidman",
+					Password: "uytru",
+				},
+			},
+			wantCode: 200, wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, gotCode, err := GetUserList(tt.args.limit, tt.args.offset)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetUserList() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("GetUserList() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("GetUserList() gotCode = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+/* GROUP tests */
+func TestCreateGroup(t *testing.T) {
+	fmt.Println("#1 CreateGroup(): insert 6 groups")
+	fmt.Println("#2 CreateGroup(): inserting existing group/incompleet JSON")
+	type argss struct {
+		params *models.Groups
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Group Fictional characters",
+			args:     argss{params: &models.Groups{ID: 1, Name: "Fictional characters"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "Group Actors",
+			args:     argss{params: &models.Groups{ID: 1, Name: "Actors"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "Group Men",
+			args:     argss{params: &models.Groups{Name: "Men"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "Group Women",
+			args:     argss{params: &models.Groups{Name: "Women"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "Group Athletes",
+			args:     argss{params: &models.Groups{Name: "Athletes"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "Group Writers",
+			args:     argss{params: &models.Groups{Name: "Writers"}},
+			wantCode: 201, wantErr: false,
+		},
+		{
+			name:     "Group Astronauts",
+			args:     argss{params: &models.Groups{Name: "Astronauts"}},
+			wantCode: 201, wantErr: false,
+		},
+		// Errors
+		{
+			name:     "Group Fictional characters",
+			args:     argss{params: &models.Groups{ID: 1, Name: "Fictional characters"}},
+			wantCode: 409, wantErr: true,
+		},
+		{
+			name:     "Incomplete JSON",
+			args:     argss{params: &models.Groups{ID: 2}},
+			wantCode: 422, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			/*if gotCode, err := CreateGroup(tt.args.params); (err != nil) != tt.wantErr {
+				t.Errorf("CreateGroup() gotCode = %v, error = %v, wantErr %v", gotCode, err, tt.wantErr)
+			}*/
+
+			gotCode, err := CreateGroup(tt.args.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("CreateGroup() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestUpdateGroup(t *testing.T) {
+	fmt.Println("#1 UpdateGroup(): update data")
+	fmt.Println("#2 UpdateGroup(): incomplete JSON")
+	type argss struct {
+		params *models.Groups
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Group 1 update",
+			args:     argss{params: &models.Groups{ID: 1, Name: "Fictional"}},
+			wantCode: 200, wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			/*
+				if gotCode, err := UpdateGroup(tt.args.params); (err != nil) != tt.wantErr {
+					t.Errorf("UpdateGroup() gotCode = %v, error = %v, wantErr %v", gotCode, err, tt.wantErr)
+				}*/
+			gotCode, err := UpdateGroup(tt.args.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UpdateGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("UpdateGroup() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestGetGroup(t *testing.T) {
+	type argss struct {
+		GroupID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantRet  []*models.Groups
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Get Group 1",
+			args:     argss{GroupID: 1},
+			wantRet:  []*models.Groups{{ID: 1, Name: "Fictional"}},
+			wantCode: 200, wantErr: false,
+		},
+		{
+			name:     "Get Group 4",
+			args:     argss{GroupID: 4},
+			wantRet:  []*models.Groups{{ID: 4, Name: "Women"}},
+			wantCode: 200, wantErr: false,
+		},
+		{
+			name:     "Group not exists",
+			args:     argss{GroupID: 99999},
+			wantRet:  []*models.Groups{},
+			wantCode: 404, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, gotCode, err := GetGroup(tt.args.GroupID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("GetGroup() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("GetGroup() gotCode = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestGetGroupList(t *testing.T) {
+	type argss struct {
+		limit  int32
+		offset int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantRet  []*models.Groups
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Get Group List without parameters",
+			args:     argss{limit: 10, offset: 0}, //default values in swagger.yaml and /restapi/oprations/groups/groups_list_parameters.go
+			wantRet:  []*models.Groups{{ID: 1, Name: "Fictional"}, {ID: 2, Name: "Actors"}, {ID: 3, Name: "Men"}, {ID: 4, Name: "Women"}, {ID: 5, Name: "Athletes"}, {ID: 6, Name: "Writers"}, {ID: 7, Name: "Astronauts"}},
+			wantCode: 200, wantErr: false,
+		},
+		{
+			name:     "Get Group List limit 3 offset 2",
+			args:     argss{limit: 3, offset: 2},
+			wantRet:  []*models.Groups{{ID: 3, Name: "Men"}, {ID: 4, Name: "Women"}, {ID: 5, Name: "Athletes"}},
+			wantCode: 200, wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, gotCode, err := GetGroupList(tt.args.limit, tt.args.offset)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetGroupList() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("GetGroupList() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("GetGroupList() gotCode = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestCreateUserGroup(t *testing.T) {
+	fmt.Println("#1 CreateGroup(): insert 22 User-Group pairs")
+	fmt.Println("#2 CreateGroup(): existing User-Group pairs and missing data in JSON")
+	type argss struct {
+		params *models.Usergroups
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{name: "User-Group pair 1-1",
+			args: argss{params: &models.Usergroups{UserID: 1, GroupID: 1}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair1-3",
+			args: argss{params: &models.Usergroups{UserID: 1, GroupID: 3}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 1-5",
+			args: argss{params: &models.Usergroups{UserID: 1, GroupID: 5}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 2-2",
+			args: argss{params: &models.Usergroups{UserID: 2, GroupID: 2}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 2-1",
+			args: argss{params: &models.Usergroups{UserID: 2, GroupID: 3}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 3-2",
+			args: argss{params: &models.Usergroups{UserID: 3, GroupID: 2}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 3-4",
+			args: argss{params: &models.Usergroups{UserID: 3, GroupID: 4}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 4-2",
+			args: argss{params: &models.Usergroups{UserID: 4, GroupID: 2}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 4-3",
+			args: argss{params: &models.Usergroups{UserID: 4, GroupID: 3}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 4-5",
+			args: argss{params: &models.Usergroups{UserID: 4, GroupID: 5}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 5-2",
+			args: argss{params: &models.Usergroups{UserID: 5, GroupID: 2}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 5-4",
+			args: argss{params: &models.Usergroups{UserID: 5, GroupID: 4}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 6-2",
+			args: argss{params: &models.Usergroups{UserID: 6, GroupID: 2}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 6-3",
+			args: argss{params: &models.Usergroups{UserID: 6, GroupID: 3}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 6-5",
+			args: argss{params: &models.Usergroups{UserID: 6, GroupID: 5}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 7-6",
+			args: argss{params: &models.Usergroups{UserID: 7, GroupID: 6}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 7-3",
+			args: argss{params: &models.Usergroups{UserID: 7, GroupID: 3}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 7-5",
+			args: argss{params: &models.Usergroups{UserID: 7, GroupID: 5}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 8-5",
+			args: argss{params: &models.Usergroups{UserID: 8, GroupID: 5}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 8-3",
+			args: argss{params: &models.Usergroups{UserID: 8, GroupID: 3}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 9-6",
+			args: argss{params: &models.Usergroups{UserID: 9, GroupID: 6}}, wantCode: 201, wantErr: false},
+		{name: "User-Group pair 9-3",
+			args: argss{params: &models.Usergroups{UserID: 9, GroupID: 3}}, wantCode: 201, wantErr: false},
+		// Errors
+		{name: "User-Group pair 1-1",
+			args: argss{params: &models.Usergroups{UserID: 1, GroupID: 1}}, wantCode: 409, wantErr: true},
+		{name: "Incomplete JSON: missing UserID",
+			args: argss{params: &models.Usergroups{GroupID: 3}}, wantCode: 422, wantErr: true},
+		{name: "Incomplete JSON: missing GroupID",
+			args: argss{params: &models.Usergroups{GroupID: 5}}, wantCode: 422, wantErr: true},
+		{name: "User-Group non-existing UserID",
+			args: argss{params: &models.Usergroups{UserID: 99999, GroupID: 5}}, wantCode: 404, wantErr: true},
+		{name: "User-Group non-existing GroupID",
+			args: argss{params: &models.Usergroups{UserID: 1, GroupID: 99999}}, wantCode: 404, wantErr: true},
+		{name: "User-Group non-existing UserID & GroupID",
+			args: argss{params: &models.Usergroups{UserID: 99999, GroupID: 99999}}, wantCode: 404, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			/*
+				if gotCode, err := CreateUserGroup(tt.args.params); (err != nil) != tt.wantErr {
+					t.Errorf("CreateUserGroup() error gotCode = %v, error = %v, wantErr %v", gotCode, err, tt.wantErr)
+				}*/
+			gotCode, err := CreateUserGroup(tt.args.params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateUserGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("CreateUserGroup() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+/* USERGROUPS TEST */
+func TestGetUserGroup(t *testing.T) {
+	type argss struct {
+		UsergroupID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantRet  []*models.Usergroups
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Get User-Group 1",
+			args:     argss{UsergroupID: 1},
+			wantRet:  []*models.Usergroups{{ID: 1, UserID: 1, GroupID: 1}},
+			wantCode: 200, wantErr: false,
+		},
+		{
+			name:     "User-Group not exists",
+			args:     argss{UsergroupID: 99999},
+			wantRet:  []*models.Usergroups{},
+			wantCode: 404, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, gotCode, err := GetUserGroup(tt.args.UsergroupID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetUserGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("GetUserGroup() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("GetUserGroup() gotCode = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestGetUserListInGroup(t *testing.T) {
+	type argss struct {
+		GroupID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantRet  []*models.Usergroups
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Get User List in Group 5",
+			args:     argss{GroupID: 5},
+			wantCode: 200, wantRet: []*models.Usergroups{{GroupID: 5, ID: 3, UserID: 1}, {GroupID: 5, ID: 10, UserID: 4}, {GroupID: 5, ID: 15, UserID: 6}, {GroupID: 5, ID: 18, UserID: 7}, {GroupID: 5, ID: 19, UserID: 8}}, wantErr: false,
+		},
+		{
+			name:     "Get User List in Group 7 (no users)",
+			args:     argss{GroupID: 7},
+			wantRet:  []*models.Usergroups{},
+			wantCode: 404, wantErr: true,
+		},
+		{
+			name:     "Group ID not exists",
+			args:     argss{GroupID: 99999},
+			wantRet:  []*models.Usergroups{},
+			wantCode: 404, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, gotCode, err := GetUserListInGroup(tt.args.GroupID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetUserListInGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("GetUserListInGroup() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("GetUserListInGroup() gotCode = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestGetGroupsListForUser(t *testing.T) {
+	type argss struct {
+		UserID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantRet  []*models.Usergroups
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Get Group List for User 1",
+			args:     argss{UserID: 1},
+			wantCode: 200, wantRet: []*models.Usergroups{{GroupID: 1, ID: 1, UserID: 1}, {GroupID: 3, ID: 2, UserID: 1}, {GroupID: 5, ID: 3, UserID: 1}}, wantErr: false,
+		},
+		{
+			name:     "Get Group List for User 10 (no groups)",
+			args:     argss{UserID: 10},
+			wantRet:  []*models.Usergroups{},
+			wantCode: 404, wantErr: true,
+		},
+		{
+			name:     "User ID not exists",
+			args:     argss{UserID: 99999},
+			wantRet:  []*models.Usergroups{},
+			wantCode: 404, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, gotCode, err := GetGroupsListForUser(tt.args.UserID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetGroupsListForUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("GetGroupsListForUser() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("GetGroupsListForUser() gotCode = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+/* DELETE data tests */
+
+func TestDeleteGroup(t *testing.T) {
+	type argss struct {
+		GroupID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Delete Group 7",
+			args:     argss{GroupID: 7},
+			wantCode: 200, wantErr: true,
+		},
+		{
+			name:     "Error: Unable to non-existing Group",
+			args:     argss{GroupID: 99999},
+			wantCode: 404, wantErr: true,
+		},
+		{
+			name:     "Conflict: Unable to delete a group that has members",
+			args:     argss{GroupID: 1},
+			wantCode: 409, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCode, err := DeleteGroup(tt.args.GroupID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeleteGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("DeleteGroup() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestDeleteUser(t *testing.T) {
+	type argss struct {
+		UserID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Delete User 4",
+			args:     argss{UserID: 4},
+			wantCode: 200, wantErr: true,
+		},
+		{
+			name:     "Delete non-existing User",
+			args:     argss{UserID: 99999},
+			wantCode: 404, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCode, err := DeleteUser(tt.args.UserID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeleteUser() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("DeleteUser() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestDeleteUserGroup(t *testing.T) {
+	type argss struct {
+		UsergroupID int64
+	}
+	tests := []struct {
+		name     string
+		args     argss
+		wantCode int
+		wantErr  bool
+	}{
+		{
+			name:     "Delete UserGroup 1",
+			args:     argss{UsergroupID: 1},
+			wantCode: 200, wantErr: true,
+		},
+		{
+			name:     "Delete non-existing User",
+			args:     argss{UsergroupID: 99999},
+			wantCode: 404, wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCode, err := DeleteUserGroup(tt.args.UsergroupID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeleteUserGroup() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotCode != tt.wantCode {
+				t.Errorf("DeleteUserGroup() = %v, want %v", gotCode, tt.wantCode)
+			}
+		})
+	}
+}

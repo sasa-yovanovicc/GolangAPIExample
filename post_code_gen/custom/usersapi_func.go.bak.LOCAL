@@ -1,0 +1,452 @@
+// This file is safe to edit. Once it exists it will not be overwritten
+
+package custom
+
+import (
+	"os"
+	"regexp"
+	"strings"
+
+	//gorm
+	_ "github.com/go-sql-driver/mysql" // register mysql driver
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql" //gorm mysql driver
+
+	//	_ "github.com/go-sql-driver/mysql" // register mysql driver
+	"github.com/joho/godotenv"
+	log "github.com/sirupsen/logrus"
+
+	errors "github.com/go-openapi/errors"
+
+	"3fstest/models"
+)
+
+type UserStruct struct { // user
+	//	gorm.Model
+	ID       int64  `gorm:"AUTO_INCREMENT"`
+	Email    string `gorm:"type:varchar(200);unique_index"`
+	Password string `gorm:"size:200"`
+	Name     string `gorm:"type:varchar(200)`
+}
+type GroupStruct struct { // user
+	//	gorm.Model
+	ID   int64  `gorm:"AUTO_INCREMENT"`
+	Name string `gorm:"type:varchar(200)`
+}
+type UserGroupStruct struct { // user
+	//	gorm.Model
+	ID      int64 `gorm:"AUTO_INCREMENT"`
+	UserID  int64 //`gorm:"column:user_id"`
+	GroupID int64 //`gorm:"column:group_id"`
+}
+type ErrorStruct struct {
+	Code    int64
+	Message string
+}
+
+// set table names http://gorm.io/docs/conventions.html
+func (UserStruct) TableName() string {
+	return "users"
+}
+func (GroupStruct) TableName() string {
+	return "groups"
+}
+func (UserGroupStruct) TableName() string {
+	return "usergroups"
+}
+
+var messages = map[string]string{
+	"groupExists":       "Group exists",
+	"groupNotExists":    "Group not exists",
+	"groupNotFound":     "Group not found",
+	"groupsNotFound":    "Groups not found",
+	"groupIsNotEmpty":   "Group is not empty",
+	"userExists":        "User exists",
+	"userNotExists":     "User not exists",
+	"userNotFound":      "User not found",
+	"emailExist":        "Email exist",
+	"incompleteJSON":    "Incomplete JSON",  //  422 Unprocessable Entity
+	"usergroupExists":   "UserGroup exists", // 409 Conflict
+	"userIdNotExist":    "User Id not exists",
+	"groupIdNotExist":   "Group Id not exists",
+	"deleted":           "Deleted",
+	"usergroupNotFound": "User-Group pair not found",
+	"groupIsEmpty":      "Group is empty",
+	"userHasNoGroups":   "User has not groups",
+}
+
+func envLoad() {
+	// issue https://github.com/joho/godotenv/issues/43
+	// Can't use godotenv when running tests #43
+	const projectDirName = "3fstest"
+	re := regexp.MustCompile(`^(.*` + projectDirName + `)`)
+	cwd, _ := os.Getwd()
+	rootPath := re.Find([]byte(cwd))
+
+	err := godotenv.Load(string(rootPath) + `/.env`)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"cause": err,
+			"cwd":   cwd,
+		}).Fatal("Problem loading .env file")
+
+		os.Exit(-1)
+	}
+
+}
+
+func dbConn() (db *gorm.DB) {
+	envLoad()
+	dbDriver := "mysql"
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASS")
+	dbName := os.Getenv("DB_NAME")
+
+	db, err := gorm.Open(dbDriver, dbUser+":"+dbPass+"@/"+dbName+"?charset=utf8&parseTime=True&loc=Local")
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return db
+}
+
+/*** USERS functions ***/
+func CreateUser(params *models.Users) (code int, error error) {
+	db := dbConn()
+
+	defer db.Close()
+	if params.Email == "" || params.Password == "" || params.Name == "" {
+		//  422 Unprocessable Entity
+		message := messages["incompleteJSON"]
+		return 422, errors.New(422, message)
+	}
+	// omit ID
+	user := UserStruct{Email: params.Email, Password: params.Password, Name: params.Name}
+	// check: is user email exists?
+	err := db.Where("email = ?", params.Email).First(&user).RecordNotFound()
+
+	if err == true {
+		db.NewRecord(user)
+		db.Create(&user)
+		db.NewRecord(user)
+	} else {
+		//	message := "User exists" // Conflict, HTTP Code 409
+		message := messages["userExists"]
+		return 409, errors.New(409, message)
+	}
+	params.ID = user.ID
+	return 201, nil
+}
+func UpdateUser(params *models.Users) (code int, error error) {
+	db := dbConn()
+	defer db.Close()
+	if params.Email == "" || params.Password == "" || params.Name == "" {
+		//  422 Unprocessable Entity
+		return 422, errors.New(422, messages["incompleteJSON"])
+	}
+	user := UserStruct{ID: params.ID, Email: params.Email, Password: params.Password, Name: params.Name}
+
+	err := db.Where("id = ?", params.ID).Find(&user).RecordNotFound()
+
+	if err == true {
+		return 404, errors.New(404, messages["userNotExists"])
+	}
+
+	err2 := db.Model(&user).Where("id = ?", params.ID).Updates(UserStruct{Email: params.Email, Password: params.Password, Name: params.Name}).Error
+
+	if err2 != nil && strings.Contains(err2.Error(), "1062") {
+		message := messages["emailExist"]
+		return 409, errors.New(409, message)
+	}
+	return 200, nil
+}
+func GetUser(UserID int64) (ret []*models.Users, code int, err error) {
+	db := dbConn()
+	defer db.Close()
+	ret = make([]*models.Users, 0)
+	user := new(models.Users)
+
+	res := db.Where("id = ?", UserID).First(&user)
+
+	if res.RecordNotFound() {
+		return ret, 404, errors.New(404, messages["userNotFound"])
+	}
+
+	ret = append(ret, user)
+
+	return ret, 200, err
+}
+
+func GetUserList(limit int32, offset int64) (ret []*models.Users, code int, err error) {
+	var count int
+	var userList []models.Users
+	db := dbConn()
+	defer db.Close()
+	db.Raw("SELECT * FROM users LIMIT ?, ?", offset, limit).Scan(&userList)
+	count = len(userList)
+	if count == 0 {
+		return ret, 404, errors.New(404, messages["usersNotFound"])
+	}
+	ret = make([]*models.Users, 0)
+
+	for i := 0; i < count; i++ {
+		ret = append(ret, &userList[i])
+	}
+	return ret, 200, err
+}
+
+func DeleteUser(UserID int64) (code int, error error) {
+	db := dbConn()
+	user := UserStruct{}
+	// first find group by id because delete can't return error
+	err := db.Where("id = ?", UserID).Find(&user).RecordNotFound()
+	if err == true {
+		return 404, errors.New(404, messages["userNotFound"])
+	}
+	db.Where("id = ?", UserID).Delete(&user)
+
+	return 200, errors.New(200, messages["deleted"])
+}
+
+/*** GROUPS functions ***/
+func CreateGroup(params *models.Groups) (code int, error error) {
+	db := dbConn()
+	defer db.Close()
+	if params.Name == "" {
+		//  422 Unprocessable Entity
+		message := messages["incompleteJSON"]
+		return 422, errors.New(422, message)
+	}
+	group := GroupStruct{Name: params.Name}
+
+	err := db.Where("name = ?", params.Name).First(&group).RecordNotFound()
+
+	if err == true {
+		db.NewRecord(group)
+		db.Create(&group)
+		db.NewRecord(group)
+	} else {
+		//	message := "Group exists" // Conflict, HTTP Code 409
+		message := messages["groupExists"]
+		return 409, errors.New(409, message)
+
+	}
+	// update ID with past inserted ID
+	params.ID = group.ID
+	return 201, nil
+}
+
+func UpdateGroup(params *models.Groups) (code int, error error) {
+	db := dbConn()
+	defer db.Close()
+	if params.Name == "" {
+		//  422 Unprocessable Entity
+		message := messages["incompleteJSON"]
+		return 422, errors.New(422, message)
+	}
+	group := GroupStruct{Name: params.Name}
+
+	err := db.Where("id = ?", params.ID).Find(&group).RecordNotFound()
+
+	if err == true {
+		message := messages["groupNotExists"]
+		return code, errors.New(404, message)
+	}
+
+	err2 := db.Model(&group).Where("id = ?", params.ID).Updates(GroupStruct{Name: params.Name}).Error
+
+	if err2 != nil && strings.Contains(err2.Error(), "1062") {
+		message := messages["groupExists"]
+		return code, errors.New(409, message)
+	}
+
+	return 200, nil
+}
+
+func GetGroup(GroupID int64) (ret []*models.Groups, code int, err error) {
+	db := dbConn()
+	defer db.Close()
+	ret = make([]*models.Groups, 0)
+	group := new(models.Groups)
+
+	res := db.Where("id = ?", GroupID).First(&group)
+
+	if res.RecordNotFound() {
+		return ret, 404, errors.New(404, messages["groupNotFound"])
+	}
+
+	ret = append(ret, group)
+
+	return ret, 200, err
+
+}
+func GetGroupList(limit int32, offset int64) (ret []*models.Groups, code int, err error) {
+	var count int
+	var groupList []models.Groups
+	db := dbConn()
+	defer db.Close()
+	db.Raw("SELECT * FROM groups LIMIT ?, ?", offset, limit).Scan(&groupList)
+	count = len(groupList)
+	if count == 0 {
+		return nil, 404, errors.New(404, messages["groupsNotFound"])
+	}
+	ret = make([]*models.Groups, 0)
+
+	for i := 0; i < count; i++ {
+		ret = append(ret, &groupList[i])
+	}
+
+	return ret, 200, err
+}
+func DeleteGroup(GroupID int64) (code int, error error) {
+	var usergroup []models.Usergroups
+	db := dbConn()
+	group := GroupStruct{}
+	// first find group by id because delete can't return error
+
+	db.Where("group_id = ?", GroupID).Find(&usergroup)
+
+	if len(usergroup) > 0 {
+		return 409, errors.New(409, messages["groupIsNotEmpty"])
+	}
+
+	err := db.Where("id = ?", GroupID).Find(&group).RecordNotFound()
+
+	if err == true {
+		return 404, errors.New(404, messages["groupNotFound"])
+	}
+	db.Where("id = ?", GroupID).Delete(&group)
+
+	return 200, errors.New(200, messages["deleted"])
+}
+
+/*** USERGROUPS functions ***/
+func CreateUserGroup(params *models.Usergroups) (code int, error error) {
+	db := dbConn()
+	defer db.Close()
+	if params.UserID == 0 || params.GroupID == 0 {
+		//  422 Unprocessable Entity
+		message := messages["incompleteJSON"]
+		return 422, errors.New(422, message)
+	}
+	// omit ID
+	usergroup := UserGroupStruct{UserID: params.UserID, GroupID: params.GroupID}
+	user := UserStruct{}
+	group := GroupStruct{}
+	//check: is user-group pair already exists?
+	err1 := db.Where("user_id = ? AND group_id=?", params.UserID, params.GroupID).First(&usergroup).RecordNotFound()
+
+	if err1 == false {
+		// Conflict, HTTP Code 409
+		message := messages["usergroupExists"]
+		return 409, errors.New(409, message)
+	}
+	err2 := db.Where("id = ?", params.UserID).First(&user).RecordNotFound()
+	if err2 == true {
+		err3 := db.Where("id = ?", params.GroupID).First(&group).RecordNotFound()
+		if err3 == true {
+			message := messages["userIdNotExist"] + " and " + messages["groupIdNotExist"]
+			return 404, errors.New(404, message)
+		}
+		message := messages["userIdNotExist"]
+		return 404, errors.New(404, message)
+	}
+	err4 := db.Where("id = ?", params.GroupID).First(&group).RecordNotFound()
+	if err4 == true {
+		message := messages["groupIdNotExist"]
+		return 404, errors.New(404, message)
+	}
+
+	db.NewRecord(usergroup)
+	db.Create(&usergroup)
+	db.NewRecord(usergroup)
+
+	params.ID = usergroup.ID
+	return 201, nil
+}
+func GetUserGroup(UsergroupID int64) (ret []*models.Usergroups, code int, err error) {
+	db := dbConn()
+	defer db.Close()
+	ret = make([]*models.Usergroups, 0)
+	usergroup := new(models.Usergroups)
+
+	res := db.Where("id = ?", UsergroupID).First(&usergroup)
+
+	if res.RecordNotFound() {
+		return ret, 404, errors.New(404, messages["usergroupNotFound"])
+	}
+
+	ret = append(ret, usergroup)
+
+	return ret, 200, err
+
+}
+func GetUserListInGroup(GroupID int64) (ret []*models.Usergroups, code int, err error) {
+	var count int
+	var usergroupList []models.Usergroups
+	var group []models.Groups
+	ret = make([]*models.Usergroups, 0)
+
+	db := dbConn()
+	defer db.Close()
+
+	db.Where("id = ?", GroupID).First(&group)
+
+	if len(group) == 0 {
+		return ret, 404, errors.New(404, messages["groupNotFound"])
+	}
+
+	db.Raw("select * from usergroups where group_id=?", GroupID).Scan(&usergroupList)
+	count = len(usergroupList)
+	if count == 0 {
+		return ret, 404, errors.New(404, messages["groupIsEmpty"])
+	}
+
+	for i := 0; i < count; i++ {
+		ret = append(ret, &usergroupList[i])
+	}
+
+	return ret, 200, err
+
+}
+
+func GetGroupsListForUser(UserID int64) (ret []*models.Usergroups, code int, err error) {
+	var count int
+	var usergroupList []models.Usergroups
+	var user []models.Users
+	ret = make([]*models.Usergroups, 0)
+	db := dbConn()
+	defer db.Close()
+
+	db.Where("id = ?", UserID).First(&user)
+
+	if len(user) == 0 {
+		return ret, 404, errors.New(404, messages["userNotFound"])
+	}
+
+	db.Where("user_id = ?", UserID).Find(&usergroupList)
+	count = len(usergroupList)
+	if count == 0 {
+		return ret, 404, errors.New(404, messages["userHasNoGroups"])
+	}
+
+	for i := 0; i < count; i++ {
+		ret = append(ret, &usergroupList[i])
+	}
+
+	return ret, 200, err
+}
+func DeleteUserGroup(UsergroupID int64) (code int, error error) {
+	db := dbConn()
+	usergroup := UserGroupStruct{}
+	// first find group by id because delete can't return error
+	err := db.Where("id = ?", UsergroupID).Find(&usergroup).RecordNotFound()
+
+	if err == true {
+		return 404, errors.New(404, messages["usergroupNotFound"])
+	}
+	db.Where("id = ?", UsergroupID).Delete(&usergroup)
+
+	return 200, errors.New(200, messages["deleted"])
+}

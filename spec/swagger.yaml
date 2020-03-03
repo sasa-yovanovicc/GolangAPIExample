@@ -1,0 +1,477 @@
+swagger: '2.0'
+info:
+  description: This is a simple user/groups RESTfull API
+  version: 1.0.0
+  title: User Groups API
+  contact:
+    email: sasa_jovanovic@aol.com
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+
+schemes: [http]    
+host: localhost:3000
+basePath: /api
+consumes: [application/json]
+produces: [application/json]
+
+tags:
+- name: users
+  description: Operations about User
+- name: groups
+  description: Operations about Groups
+- name: usergroups
+  description: Operations about User-Groups
+
+paths:
+# users
+  /users:
+    post:
+      tags:
+      - users
+      summary: Create user
+      description: Create user
+      operationId: UserCreate
+      consumes:
+      - application/json     
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        description: Created user object
+        required: true
+        schema:
+          $ref: '#/definitions/users'
+      responses:
+        201:
+          description: Created
+          schema:
+            $ref: '#/definitions/users'                  
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'                     
+    get:
+      tags:
+        - users
+      summary: List users
+      operationId: UserList
+      produces:
+        - application/json
+      parameters:
+        - $ref: '#/parameters/PageOffset'
+        - $ref: '#/parameters/PageLimit'
+      responses:
+        200:
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/users'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'   
+    put:
+      tags:
+      - users
+      summary: Update an existing user
+      operationId: UserUpdate
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        description: User object needs to be updated
+        required: true
+        schema:
+          $ref: '#/definitions/users'
+      responses:
+        200:
+          description: Updated
+          schema:
+            $ref: '#/definitions/users'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'
+# users by userId operations                 
+  /users/{userId}:                  
+    get:
+      tags:
+      - users
+      summary: Find user by ID
+      description: Returns a single user
+      operationId: UserGet
+      produces:
+      - application/json
+      parameters:
+      - name: userId
+        in: path
+        description: ID of user to return
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/users'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error' 
+    delete:
+      tags:
+      - users
+      summary: Deleting a user found by ID
+      operationId: UserDelete
+      produces:
+      - application/json
+      parameters:
+      - name: userId
+        in: path
+        description: User id to delete
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: Deleted
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/error'
+# groups
+  /groups:
+    post:
+      tags:
+      - groups
+      summary: Create group
+      description: Create group
+      operationId: GroupCreate
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        description: Created group object
+        required: true
+        schema:
+          $ref: '#/definitions/groups'
+      responses:
+        201:
+          description: Created
+          schema:
+            $ref: '#/definitions/groups' 
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error' 
+    get:
+      tags:
+      - groups
+      summary: Get all group
+      operationId: GroupList
+      produces:
+      - application/json
+      #parameters: []
+      parameters:
+        - $ref: '#/parameters/PageOffset'
+        - $ref: '#/parameters/PageLimit'
+      responses:
+        200:
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/groups'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'        
+    put:
+      tags:
+      - groups
+      summary: Update an existing group
+      operationId: GroupUpdate
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        description: Group object needs to be updated
+        required: true
+        schema:
+          $ref: '#/definitions/groups'
+      responses:
+        200:
+          description: Updated
+          schema:
+            $ref: '#/definitions/groups'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'               
+# group by userId operations        
+  /groups/{groupId}:
+    get:
+      tags:
+      - groups
+      summary: Find group by ID
+      description: Returns a singlegroup
+      operationId: GroupGet
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        description: ID of group to return
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/groups'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'   
+    delete:
+      tags:
+      - groups
+      summary: Deleting a group found by ID
+      operationId: GroupDelete
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        description: User id to delete
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: Deleted
+        409:
+          description: Conflict         
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/error' 
+
+# usergroups        
+  /usergroups:
+    post:
+      tags:
+      - usergroups
+      summary: Assign the user to group
+      description: Assign the user to group
+      operationId: UserGroupCreate
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      parameters:
+      - in: body
+        name: body
+        description: Created group object
+        required: true
+        schema:
+          $ref: '#/definitions/usergroups'
+      responses:
+        201:
+          description: Created
+          schema:
+            $ref: '#/definitions/usergroups'          
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'   
+  /usergroups/id/{usergroupId}:   
+    get:
+      tags:
+      - usergroups
+      summary: Find usergroups by ID
+      description: Returns a single usergroup
+      operationId: UserGroupGet
+      produces:
+      - application/json
+      parameters:
+      - name: usergroupId
+        in: path
+        description: ID of group to return
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/usergroups'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'   
+    delete:
+      tags:
+      - usergroups
+      summary: Deletes a usergroup
+      operationId: UserGroupDelete
+      produces:
+      - application/json
+      parameters:
+      - name: usergroupId
+        in: path
+        description: UserGroups id to delete
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: Deleted 
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error' 
+  /usergroups/ingroup/{groupId}:
+    get:
+      tags:
+      - usergroups
+      summary: Find all users in choosen group by ID
+      description: Returns all users in choosen group by ID
+      operationId: UserListInGroup
+      produces:
+      - application/json
+      parameters:
+      - name: groupId
+        in: path
+        description: ID of group to return
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/usergroups'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'  
+  /usergroups/foruser/{userId}:
+    get:
+      tags:
+      - usergroups
+      summary: Find all groups assigned to choosen users by ID
+      description: Returns all groups assigned to choosen users by ID
+      operationId: GroupsListForUser
+      produces:
+      - application/json
+      parameters:
+      - name: userId
+        in: path
+        description: ID of user to return
+        required: true
+        type: integer
+        format: int64
+      responses:
+        200:
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/usergroups'
+        default:
+          description: generic error response
+          schema:
+            $ref: '#/definitions/error'                      
+definitions:
+  users:
+    type: object
+    properties:
+      id:
+        type: integer
+        format: int64
+        description: User ID
+      email:
+        type: string
+        description: User Email
+      password:
+        type: string
+        description: User Password
+      name:
+        type: string
+        description: User Name 
+    xml:
+      name: User
+  groups:
+    type: object
+    properties:
+      id:
+        type: integer
+        format: int64
+        description: Group ID
+      name:
+        type: string
+        description: Group Name
+    xml:
+      name: Group
+  usergroups:
+    type: object
+    properties:
+      id:
+        type: integer
+        format: int64
+        description: User-Group pair ID
+      user_id:
+        type: integer
+        format: int64
+        description: User ID
+      group_id:
+        type: integer
+        format: int64       
+        description: Group ID
+    xml:
+      name: UserGroups      
+# Schema for error response body
+  error:
+    type: object
+    required:
+      - message
+    properties:
+      code:
+        type: integer
+        format: int64
+      message:
+        type: string
+parameters:
+  PageOffset:
+    name: offset
+    in: query
+    type: integer
+    format: int64
+    default: 0
+    
+  PageLimit:
+    name: limit
+    in: query
+    type: integer
+    format: int32
+    default: 10

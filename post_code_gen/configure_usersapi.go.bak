@@ -1,0 +1,235 @@
+// This file is safe to edit. Once it exists it will not be overwritten
+
+package restapi
+
+import (
+	"crypto/tls"
+	"net/http"
+
+	_ "github.com/go-sql-driver/mysql"        // register mysql driver
+	_ "github.com/jinzhu/gorm/dialects/mysql" //gorm mysql driver
+
+	errors "github.com/go-openapi/errors"
+	runtime "github.com/go-openapi/runtime"
+	middleware "github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/swag"
+
+	"3fstest/models"
+	"3fstest/restapi/custom"
+	"3fstest/restapi/operations"
+	"3fstest/restapi/operations/groups"
+	"3fstest/restapi/operations/usergroups"
+	"3fstest/restapi/operations/users"
+)
+
+//go:generate swagger generate server --target ../../3fstest --name Usersapi --spec ../spec/swagger.json
+
+func configureFlags(api *operations.UsersapiAPI) {
+
+}
+
+func configureAPI(api *operations.UsersapiAPI) http.Handler {
+	// configure the api here
+	api.ServeError = errors.ServeError
+
+	// Set your custom logger if needed. Default one is log.Printf
+	// Expected interface func(string, ...interface{})
+	//
+	// Example:
+	// api.Logger = log.Printf
+
+	api.JSONConsumer = runtime.JSONConsumer()
+
+	api.JSONProducer = runtime.JSONProducer()
+
+	/************
+	* Users
+	*************/
+	/* POST create group */
+
+	api.GroupsGroupCreateHandler = groups.GroupCreateHandlerFunc(func(params groups.GroupCreateParams) middleware.Responder {
+		if code, err := custom.CreateGroup(params.Body); err != nil {
+			return groups.NewGroupCreateDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+		return groups.NewGroupCreateCreated().WithPayload(params.Body)
+	})
+	/* PUT update group (by ID) */
+	api.GroupsGroupUpdateHandler = groups.GroupUpdateHandlerFunc(func(params groups.GroupUpdateParams) middleware.Responder {
+		code, err := custom.UpdateGroup(params.Body)
+		if err != nil {
+			return groups.NewGroupUpdateDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+		return groups.NewGroupUpdateOK().WithPayload(params.Body)
+	})
+	/* GET group by ID */
+	api.GroupsGroupGetHandler = groups.GroupGetHandlerFunc(func(params groups.GroupGetParams) middleware.Responder {
+
+		ret, code, err := custom.GetGroup(params.GroupID)
+		if err != nil {
+			return groups.NewGroupGetDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return groups.NewGroupGetOK().WithPayload(ret)
+
+	})
+	/* GET group list */
+	api.GroupsGroupListHandler = groups.GroupListHandlerFunc(func(params groups.GroupListParams) middleware.Responder {
+		ret, code, err := custom.GetGroupList(*params.Limit, *params.Offset)
+		if err != nil {
+			return groups.NewGroupListDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return groups.NewGroupListOK().WithPayload(ret)
+	})
+
+	/* DELETE group by ID */
+	api.GroupsGroupDeleteHandler = groups.GroupDeleteHandlerFunc(func(params groups.GroupDeleteParams) middleware.Responder {
+		code, err := custom.DeleteGroup(params.GroupID)
+		if err != nil {
+			return groups.NewGroupDeleteDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return groups.NewGroupDeleteDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+	})
+
+	/************
+	* Users
+	*************/
+	/* POST create user */
+	api.UsersUserCreateHandler = users.UserCreateHandlerFunc(func(params users.UserCreateParams) middleware.Responder {
+		code, err := custom.CreateUser(params.Body)
+		if err != nil {
+			return users.NewUserCreateDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+		return users.NewUserCreateCreated().WithPayload(params.Body)
+	})
+	/* PUT update user (by ID) */
+	api.UsersUserUpdateHandler = users.UserUpdateHandlerFunc(func(params users.UserUpdateParams) middleware.Responder {
+		code, err := custom.UpdateUser(params.Body)
+		if err != nil {
+			return users.NewUserUpdateDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+		return users.NewUserUpdateOK().WithPayload(params.Body)
+	})
+	/* DELETE user by ID */
+	api.UsersUserDeleteHandler = users.UserDeleteHandlerFunc(func(params users.UserDeleteParams) middleware.Responder {
+
+		code, err := custom.DeleteUser(params.UserID)
+		if err != nil {
+			return users.NewUserDeleteDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return users.NewUserDeleteDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+
+	})
+
+	/* GET user by ID */
+	api.UsersUserGetHandler = users.UserGetHandlerFunc(func(params users.UserGetParams) middleware.Responder {
+
+		ret, code, err := custom.GetUser(params.UserID)
+		if err != nil {
+			return users.NewUserGetDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return users.NewUserGetOK().WithPayload(ret)
+
+	})
+	/* GET user list */
+	api.UsersUserListHandler = users.UserListHandlerFunc(func(params users.UserListParams) middleware.Responder {
+
+		ret, code, err := custom.GetUserList(*params.Limit, *params.Offset)
+		if err != nil {
+			return users.NewUserListDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return users.NewUserListOK().WithPayload(ret)
+
+	})
+
+	/************
+	* UserGroups
+	*************/
+	/* POST Create User Group pair */
+	api.UsergroupsUserGroupCreateHandler = usergroups.UserGroupCreateHandlerFunc(func(params usergroups.UserGroupCreateParams) middleware.Responder {
+		if code, err := custom.CreateUserGroup(params.Body); err != nil {
+			return usergroups.NewUserGroupCreateDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+		return usergroups.NewUserGroupCreateCreated().WithPayload(params.Body)
+
+	})
+
+	api.UsergroupsUserGroupDeleteHandler = usergroups.UserGroupDeleteHandlerFunc(func(params usergroups.UserGroupDeleteParams) middleware.Responder {
+
+		code, err := custom.DeleteUserGroup(params.UsergroupID)
+		if err != nil {
+			return usergroups.NewUserGroupDeleteDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return usergroups.NewUserGroupDeleteDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+	})
+	/* PUT - there is no reason to edit child table in Many-To-Many relation, just delete wrong or unnecessery record */
+
+	/* GET usergroup by id */
+	api.UsergroupsUserGroupGetHandler = usergroups.UserGroupGetHandlerFunc(func(params usergroups.UserGroupGetParams) middleware.Responder {
+		ret, code, err := custom.GetUserGroup(params.UsergroupID)
+		if err != nil {
+			return usergroups.NewUserGroupGetDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return usergroups.NewUserGroupGetOK().WithPayload(ret)
+
+	})
+
+	/* GET all users in One Group */
+	api.UsergroupsUserListInGroupHandler = usergroups.UserListInGroupHandlerFunc(func(params usergroups.UserListInGroupParams) middleware.Responder {
+		ret, code, err := custom.GetUserListInGroup(params.GroupID)
+		if err != nil {
+			return usergroups.NewUserListInGroupDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return usergroups.NewUserListInGroupOK().WithPayload(ret)
+	})
+	/* GET all Groups where is assigned certain User */
+	api.UsergroupsGroupsListForUserHandler = usergroups.GroupsListForUserHandlerFunc(func(params usergroups.GroupsListForUserParams) middleware.Responder {
+		ret, code, err := custom.GetGroupsListForUser(params.UserID)
+		if err != nil {
+			return usergroups.NewGroupsListForUserDefault(code).WithPayload(&models.Error{Code: int64(code), Message: swag.String(err.Error())})
+		}
+
+		return usergroups.NewGroupsListForUserOK().WithPayload(ret)
+
+	})
+
+	/* GET all User-Group records - there is not reason in real-life to get all records */
+
+	api.PreServerShutdown = func() {}
+
+	api.ServerShutdown = func() {}
+
+	return setupGlobalMiddleware(api.Serve(setupMiddlewares))
+}
+
+// The TLS configuration before HTTPS server starts.
+func configureTLS(tlsConfig *tls.Config) {
+	// Make all necessary changes to the TLS configuration here.
+}
+
+// As soon as server is initialized but not run yet, this function will be called.
+// If you need to modify a config, store server instance to stop it individually later, this is the place.
+// This function can be called multiple times, depending on the number of serving schemes.
+// scheme value will be set accordingly: "http", "https" or "unix"
+func configureServer(s *http.Server, scheme, addr string) {
+}
+
+// The middleware configuration is for the handler executors. These do not apply to the swagger.json document.
+// The middleware executes after routing but before authentication, binding and validation
+func setupMiddlewares(handler http.Handler) http.Handler {
+
+	return handler
+}
+
+// The middleware configuration happens before anything, this middleware also applies to serving the swagger.json document.
+// So this is a good place to plug in a panic handling middleware, logging and metrics
+func setupGlobalMiddleware(handler http.Handler) http.Handler {
+	return handler
+}
